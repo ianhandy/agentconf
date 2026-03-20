@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentConf — Cross-IDE AI Config Syncer</title>
+<style>
+  :root {
+    --bg: #241200;
+    --bg-deep: #1A0D00;
+    --gold: #DDC165;
+    --gold-light: #FFE9A3;
+    --orange: #E5591C;
+    --surface: #2d1a08;
+    --surface-hover: #3a2210;
+    --border: #4a3018;
+    --text: #e8dcc8;
+    --text-dim: #9a8a72;
+    --code-bg: #1a0f04;
+    --success: #4ade80;
+    --error: #f87171;
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Ambient glow background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(221,193,101,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(229,89,28,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+    animation: ambientShift 20s ease-in-out infinite alternate;
+  }
+
+  @keyframes ambientShift {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(-5%, 3%) rotate(3deg); }
+  }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 1;
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(36,18,0,0.9) 0%, rgba(26,13,0,0.95) 100%);
+    backdrop-filter: blur(20px);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--gold), var(--orange));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--bg-deep);
+    box-shadow: 0 0 20px rgba(221,193,101,0.3);
+  }
+
+  .logo h1 {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.3px;
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-left: 12px;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--gold);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--orange), #c4470f);
+    border-color: var(--orange);
+    color: white;
+    font-weight: 600;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 20px rgba(229,89,28,0.4);
+    transform: translateY(-1px);
+  }
+
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold), #c4a640);
+    border-color: var(--gold);
+    color: var(--bg-deep);
+    font-weight: 600;
+  }
+
+  .btn-gold:hover {
+    box-shadow: 0 0 20px rgba(221,193,101,0.4);
+    transform: translateY(-1px);
+  }
+
+  /* Main layout */
+  .app {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 1fr;
+    height: calc(100vh - 73px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sidebar-section {
+    margin-bottom: 16px;
+  }
+
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    padding: 8px 12px 6px;
+  }
+
+  .sidebar-item {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.15s;
+    color: var(--text);
+  }
+
+  .sidebar-item:hover {
+    background: var(--surface);
+  }
+
+  .sidebar-item.active {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--gold);
+  }
+
+  .sidebar-item .icon {
+    width: 20px;
+    text-align: center;
+    font-size: 14px;
+    opacity: 0.7;
+  }
+
+  .sidebar-item.active .icon {
+    opacity: 1;
+  }
+
+  .rule-count {
+    margin-left: auto;
+    background: var(--border);
+    color: var(--text-dim);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  /* Editor panel */
+  .editor-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(36,18,0,0.5);
+  }
+
+  .panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gold);
+  }
+
+  .panel-subtitle {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* Form editor */
+  .form-editor {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .field-group {
+    margin-bottom: 20px;
+  }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .field-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--code-bg);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .field-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(221,193,101,0.1);
+  }
+
+  textarea.field-input {
+    min-height: 100px;
+    resize: vertical;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .rule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rule-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all 0.15s;
+  }
+
+  .rule-item:hover {
+    border-color: var(--gold);
+  }
+
+  .rule-item input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  .rule-remove {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 4px;
+    transition: color 0.15s;
+  }
+
+  .rule-remove:hover {
+    color: var(--error);
+  }
+
+  .add-rule-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .add-rule-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(221,193,101,0.05);
+  }
+
+  /* Tags input */
+  .tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--code-bg);
+    min-height: 42px;
+    cursor: text;
+  }
+
+  .tag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--gold);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  .tag-remove {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 2px;
+  }
+
+  .tag-remove:hover {
+    color: var(--error);
+  }
+
+  .tags-input {
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+    flex: 1;
+    min-width: 60px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  /* Preview panel */
+  .preview-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .preview-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: rgba(36,18,0,0.5);
+  }
+
+  .preview-tab {
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .preview-tab:hover {
+    color: var(--text);
+    background: rgba(221,193,101,0.03);
+  }
+
+  .preview-tab.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+  }
+
+  .preview-tab .tab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .tab-dot.claude { background: #a78bfa; }
+  .tab-dot.cursor { background: #60a5fa; }
+  .tab-dot.copilot { background: #34d399; }
+  .tab-dot.yaml { background: var(--gold); }
+
+  .preview-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .preview-code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    padding: 20px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--text);
+    min-height: 100%;
+  }
+
+  /* Syntax colors */
+  .syn-comment { color: #6a5a42; }
+  .syn-key { color: var(--gold); }
+  .syn-string { color: #7dd3a8; }
+  .syn-heading { color: var(--orange); font-weight: 700; }
+  .syn-bullet { color: var(--gold-light); }
+  .syn-section { color: #a78bfa; font-weight: 600; }
+
+  /* Copy button */
+  .copy-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
+  }
+
+  .preview-wrapper {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .toast.success { border-color: var(--success); }
+  .toast.success::before { content: ''; color: var(--success); }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 40px;
+    text-align: center;
+  }
+
+  .empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+  }
+
+  .empty-state h3 {
+    font-size: 16px;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+    color: var(--text-dim);
+    max-width: 280px;
+    line-height: 1.5;
+  }
+
+  /* Import/Export modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.show {
+    display: flex;
+  }
+
+  .modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 560px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-header h3 {
+    font-size: 15px;
+    color: var(--gold);
+  }
+
+  .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .modal-body textarea {
+    width: 100%;
+    min-height: 300px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  .modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr 1fr;
+    }
+    .sidebar {
+      flex-direction: row;
+      overflow-x: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      padding: 8px;
+    }
+    .sidebar-section { margin-bottom: 0; }
+    .sidebar-label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">Ac</div>
+    <div>
+      <h1>AgentConf</h1>
+    </div>
+    <span class="logo-sub">Cross-IDE AI Config Syncer</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn" onclick="showImportModal()">Import YAML</button>
+    <button class="btn" onclick="exportYAML()">Export YAML</button>
+    <button class="btn-gold btn" onclick="downloadAll()">Download All</button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Configuration</div>
+      <div class="sidebar-item active" data-section="project" onclick="switchSection(this)">
+        <span class="icon">&#9881;</span>
+        Project Info
+      </div>
+      <div class="sidebar-item" data-section="rules" onclick="switchSection(this)">
+        <span class="icon">&#9997;</span>
+        Coding Rules
+        <span class="rule-count" id="rules-count">0</span>
+      </div>
+      <div class="sidebar-item" data-section="style" onclick="switchSection(this)">
+        <span class="icon">&#9733;</span>
+        Style Guide
+        <span class="rule-count" id="style-count">0</span>
+      </div>
+      <div class="sidebar-item" data-section="context" onclick="switchSection(this)">
+        <span class="icon">&#128218;</span>
+        Project Context
+      </div>
+      <div class="sidebar-item" data-section="constraints" onclick="switchSection(this)">
+        <span class="icon">&#128683;</span>
+        Constraints
+        <span class="rule-count" id="constraints-count">0</span>
+      </div>
+      <div class="sidebar-item" data-section="tools" onclick="switchSection(this)">
+        <span class="icon">&#128295;</span>
+        Tool-Specific
+      </div>
+    </div>
+    <div class="sidebar-section" style="margin-top: auto;">
+      <div class="sidebar-label">Presets</div>
+      <div class="sidebar-item" onclick="loadPreset('react')">
+        <span class="icon">&#9883;</span>
+        React / Next.js
+      </div>
+      <div class="sidebar-item" onclick="loadPreset('python')">
+        <span class="icon">&#128013;</span>
+        Python / FastAPI
+      </div>
+      <div class="sidebar-item" onclick="loadPreset('rust')">
+        <span class="icon">&#9881;</span>
+        Rust
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor Panel -->
+  <div class="editor-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title" id="editor-title">Project Info</div>
+        <div class="panel-subtitle" id="editor-subtitle">General project configuration</div>
+      </div>
+    </div>
+    <div class="form-editor" id="editor-content">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <!-- Preview Panel -->
+  <div class="preview-panel">
+    <div class="preview-tabs">
+      <div class="preview-tab active" data-format="claude" onclick="switchPreview(this)">
+        <span class="tab-dot claude"></span>
+        CLAUDE.md
+      </div>
+      <div class="preview-tab" data-format="cursor" onclick="switchPreview(this)">
+        <span class="tab-dot cursor"></span>
+        .cursor/rules
+      </div>
+      <div class="preview-tab" data-format="copilot" onclick="switchPreview(this)">
+        <span class="tab-dot copilot"></span>
+        Copilot
+      </div>
+      <div class="preview-tab" data-format="yaml" onclick="switchPreview(this)">
+        <span class="tab-dot yaml"></span>
+        agentconf.yaml
+      </div>
+    </div>
+    <div class="preview-wrapper">
+      <button class="btn copy-btn" onclick="copyPreview()">Copy</button>
+      <div class="preview-content">
+        <pre class="preview-code" id="preview-code"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Import agentconf.yaml</h3>
+      <button class="btn" onclick="hideImportModal()" style="padding: 4px 8px;">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <textarea class="field-input" id="import-textarea" placeholder="Paste your agentconf.yaml contents here..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="hideImportModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="importYAML()">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+const state = {
+  project: {
+    name: '',
+    description: '',
+    language: '',
+    framework: '',
+    testRunner: '',
+    packageManager: '',
+  },
+  rules: [],
+  style: [],
+  context: {
+    architecture: '',
+    conventions: '',
+    fileStructure: '',
+  },
+  constraints: [],
+  tools: {
+    claude: '',
+    cursor: '',
+    copilot: '',
+  }
+};
+
+let currentSection = 'project';
+let currentFormat = 'claude';
+
+// ── Section Renderers ──────────────────────────────────────
+const sections = {
+  project: {
+    title: 'Project Info',
+    subtitle: 'General project configuration',
+    render() {
+      return `
+        <div class="field-group">
+          <div class="field-label">Project Name</div>
+          <input class="field-input" value="${esc(state.project.name)}" oninput="state.project.name=this.value;renderPreview()" placeholder="my-awesome-app">
+        </div>
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <textarea class="field-input" oninput="state.project.description=this.value;renderPreview()" placeholder="Brief description of what this project does...">${esc(state.project.description)}</textarea>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Primary Language</div>
+          <input class="field-input" value="${esc(state.project.language)}" oninput="state.project.language=this.value;renderPreview()" placeholder="TypeScript, Python, Rust, etc.">
+        </div>
+        <div class="field-group">
+          <div class="field-label">Framework</div>
+          <input class="field-input" value="${esc(state.project.framework)}" oninput="state.project.framework=this.value;renderPreview()" placeholder="Next.js, FastAPI, Actix, etc.">
+        </div>
+        <div class="field-group">
+          <div class="field-label">Test Runner</div>
+          <input class="field-input" value="${esc(state.project.testRunner)}" oninput="state.project.testRunner=this.value;renderPreview()" placeholder="vitest, pytest, cargo test, etc.">
+        </div>
+        <div class="field-group">
+          <div class="field-label">Package Manager</div>
+          <input class="field-input" value="${esc(state.project.packageManager)}" oninput="state.project.packageManager=this.value;renderPreview()" placeholder="npm, pnpm, pip, cargo, etc.">
+        </div>
+      `;
+    }
+  },
+  rules: {
+    title: 'Coding Rules',
+    subtitle: 'Universal rules applied to all AI tools',
+    render() {
+      const items = state.rules.map((r, i) => `
+        <div class="rule-item">
+          <input value="${esc(r)}" oninput="state.rules[${i}]=this.value;renderPreview();updateCounts()" placeholder="e.g., Always use TypeScript strict mode">
+          <button class="rule-remove" onclick="state.rules.splice(${i},1);renderSection();renderPreview();updateCounts()">&#10005;</button>
+        </div>
+      `).join('');
+      return `
+        <div class="field-group">
+          <div class="field-label">Rules</div>
+          <div class="rule-list">
+            ${items}
+            <button class="add-rule-btn" onclick="state.rules.push('');renderSection()">+ Add Rule</button>
+          </div>
+        </div>
+      `;
+    }
+  },
+  style: {
+    title: 'Style Guide',
+    subtitle: 'Code formatting and naming conventions',
+    render() {
+      const items = state.style.map((r, i) => `
+        <div class="rule-item">
+          <input value="${esc(r)}" oninput="state.style[${i}]=this.value;renderPreview();updateCounts()" placeholder="e.g., Use camelCase for variables">
+          <button class="rule-remove" onclick="state.style.splice(${i},1);renderSection();renderPreview();updateCounts()">&#10005;</button>
+        </div>
+      `).join('');
+      return `
+        <div class="field-group">
+          <div class="field-label">Style Rules</div>
+          <div class="rule-list">
+            ${items}
+            <button class="add-rule-btn" onclick="state.style.push('');renderSection()">+ Add Rule</button>
+          </div>
+        </div>
+      `;
+    }
+  },
+  context: {
+    title: 'Project Context',
+    subtitle: 'Architecture and structural context for AI tools',
+    render() {
+      return `
+        <div class="field-group">
+          <div class="field-label">Architecture Overview</div>
+          <textarea class="field-input" oninput="state.context.architecture=this.value;renderPreview()" placeholder="Describe the high-level architecture (e.g., monorepo with apps/ and packages/, event-driven microservices...)">${esc(state.context.architecture)}</textarea>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Key Conventions</div>
+          <textarea class="field-input" oninput="state.context.conventions=this.value;renderPreview()" placeholder="Project-specific conventions (e.g., all API routes in src/routes/, use Zod for validation...)">${esc(state.context.conventions)}</textarea>
+        </div>
+        <div class="field-group">
+          <div class="field-label">File Structure Notes</div>
+          <textarea class="field-input" oninput="state.context.fileStructure=this.value;renderPreview()" placeholder="Important file structure details (e.g., shared types in packages/types/, env files in config/...)">${esc(state.context.fileStructure)}</textarea>
+        </div>
+      `;
+    }
+  },
+  constraints: {
+    title: 'Constraints',
+    subtitle: 'Things AI tools should NOT do',
+    render() {
+      const items = state.constraints.map((r, i) => `
+        <div class="rule-item">
+          <input value="${esc(r)}" oninput="state.constraints[${i}]=this.value;renderPreview();updateCounts()" placeholder="e.g., Never modify the database schema directly">
+          <button class="rule-remove" onclick="state.constraints.splice(${i},1);renderSection();renderPreview();updateCounts()">&#10005;</button>
+        </div>
+      `).join('');
+      return `
+        <div class="field-group">
+          <div class="field-label">Constraints</div>
+          <div class="rule-list">
+            ${items}
+            <button class="add-rule-btn" onclick="state.constraints.push('');renderSection()">+ Add Constraint</button>
+          </div>
+        </div>
+      `;
+    }
+  },
+  tools: {
+    title: 'Tool-Specific Overrides',
+    subtitle: 'Extra instructions for specific AI tools',
+    render() {
+      return `
+        <div class="field-group">
+          <div class="field-label">Claude-specific (CLAUDE.md only)</div>
+          <textarea class="field-input" oninput="state.tools.claude=this.value;renderPreview()" placeholder="Instructions that only apply to Claude Code...">${esc(state.tools.claude)}</textarea>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Cursor-specific (.cursor/rules only)</div>
+          <textarea class="field-input" oninput="state.tools.cursor=this.value;renderPreview()" placeholder="Instructions that only apply to Cursor...">${esc(state.tools.cursor)}</textarea>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Copilot-specific (copilot-instructions.md only)</div>
+          <textarea class="field-input" oninput="state.tools.copilot=this.value;renderPreview()" placeholder="Instructions that only apply to GitHub Copilot...">${esc(state.tools.copilot)}</textarea>
+        </div>
+      `;
+    }
+  }
+};
+
+// ── Helpers ────────────────────────────────────────────────
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function switchSection(el) {
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  currentSection = el.dataset.section;
+  renderSection();
+}
+
+function renderSection() {
+  const s = sections[currentSection];
+  document.getElementById('editor-title').textContent = s.title;
+  document.getElementById('editor-subtitle').textContent = s.subtitle;
+  document.getElementById('editor-content').innerHTML = s.render();
+}
+
+function switchPreview(el) {
+  document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentFormat = el.dataset.format;
+  renderPreview();
+}
+
+function updateCounts() {
+  document.getElementById('rules-count').textContent = state.rules.filter(r => r.trim()).length;
+  document.getElementById('style-count').textContent = state.style.filter(r => r.trim()).length;
+  document.getElementById('constraints-count').textContent = state.constraints.filter(r => r.trim()).length;
+}
+
+// ── Format Generators ──────────────────────────────────────
+
+function generateClaude() {
+  let out = '';
+  if (state.project.name) out += `# ${state.project.name}\n\n`;
+  if (state.project.description) out += `${state.project.description}\n\n`;
+
+  // Tech stack
+  const stack = [];
+  if (state.project.language) stack.push(`**Language:** ${state.project.language}`);
+  if (state.project.framework) stack.push(`**Framework:** ${state.project.framework}`);
+  if (state.project.testRunner) stack.push(`**Tests:** ${state.project.testRunner}`);
+  if (state.project.packageManager) stack.push(`**Package Manager:** ${state.project.packageManager}`);
+  if (stack.length) out += `## Tech Stack\n\n${stack.join('\n')}\n\n`;
+
+  // Context
+  const ctx = [];
+  if (state.context.architecture) ctx.push(`### Architecture\n\n${state.context.architecture}`);
+  if (state.context.conventions) ctx.push(`### Conventions\n\n${state.context.conventions}`);
+  if (state.context.fileStructure) ctx.push(`### File Structure\n\n${state.context.fileStructure}`);
+  if (ctx.length) out += `## Project Context\n\n${ctx.join('\n\n')}\n\n`;
+
+  // Rules
+  const rules = state.rules.filter(r => r.trim());
+  if (rules.length) {
+    out += `## Coding Rules\n\n${rules.map(r => `- ${r}`).join('\n')}\n\n`;
+  }
+
+  // Style
+  const style = state.style.filter(r => r.trim());
+  if (style.length) {
+    out += `## Style Guide\n\n${style.map(r => `- ${r}`).join('\n')}\n\n`;
+  }
+
+  // Constraints
+  const constraints = state.constraints.filter(r => r.trim());
+  if (constraints.length) {
+    out += `## Constraints\n\n${constraints.map(r => `- **DO NOT:** ${r}`).join('\n')}\n\n`;
+  }
+
+  // Claude-specific
+  if (state.tools.claude) {
+    out += `## Additional Instructions\n\n${state.tools.claude}\n\n`;
+  }
+
+  return out.trim() || '# CLAUDE.md\n\nConfigure your project in the editor to generate this file.';
+}
+
+function generateCursor() {
+  let out = '';
+  if (state.project.name) out += `# ${state.project.name} — Cursor Rules\n\n`;
+  if (state.project.description) out += `${state.project.description}\n\n`;
+
+  const stack = [];
+  if (state.project.language) stack.push(state.project.language);
+  if (state.project.framework) stack.push(state.project.framework);
+  if (stack.length) out += `You are working on a ${stack.join(' + ')} project.\n\n`;
+
+  if (state.project.testRunner) out += `Run tests with: ${state.project.testRunner}\n`;
+  if (state.project.packageManager) out += `Package manager: ${state.project.packageManager}\n`;
+  if (state.project.testRunner || state.project.packageManager) out += '\n';
+
+  // Context
+  if (state.context.architecture) out += `## Architecture\n\n${state.context.architecture}\n\n`;
+  if (state.context.conventions) out += `## Conventions\n\n${state.context.conventions}\n\n`;
+  if (state.context.fileStructure) out += `## File Structure\n\n${state.context.fileStructure}\n\n`;
+
+  // Rules + Style combined
+  const allRules = [
+    ...state.rules.filter(r => r.trim()),
+    ...state.style.filter(r => r.trim())
+  ];
+  if (allRules.length) {
+    out += `## Rules\n\n${allRules.map(r => `- ${r}`).join('\n')}\n\n`;
+  }
+
+  // Constraints
+  const constraints = state.constraints.filter(r => r.trim());
+  if (constraints.length) {
+    out += `## Do NOT\n\n${constraints.map(r => `- ${r}`).join('\n')}\n\n`;
+  }
+
+  // Cursor-specific
+  if (state.tools.cursor) {
+    out += `## Additional\n\n${state.tools.cursor}\n\n`;
+  }
+
+  return out.trim() || '# Cursor Rules\n\nConfigure your project in the editor to generate this file.';
+}
+
+function generateCopilot() {
+  let out = '';
+  if (state.project.description) out += `${state.project.description}\n\n`;
+
+  const stack = [];
+  if (state.project.language) stack.push(state.project.language);
+  if (state.project.framework) stack.push(state.project.framework);
+  if (stack.length) out += `This is a ${stack.join(' + ')} project.\n\n`;
+
+  if (state.project.testRunner) out += `- Test runner: ${state.project.testRunner}\n`;
+  if (state.project.packageManager) out += `- Package manager: ${state.project.packageManager}\n`;
+  if (state.project.testRunner || state.project.packageManager) out += '\n';
+
+  // Context
+  if (state.context.architecture) out += `Architecture: ${state.context.architecture}\n\n`;
+  if (state.context.conventions) out += `Conventions: ${state.context.conventions}\n\n`;
+  if (state.context.fileStructure) out += `File structure: ${state.context.fileStructure}\n\n`;
+
+  // Rules
+  const rules = [
+    ...state.rules.filter(r => r.trim()),
+    ...state.style.filter(r => r.trim())
+  ];
+  if (rules.length) {
+    out += `When writing code, follow these rules:\n${rules.map(r => `- ${r}`).join('\n')}\n\n`;
+  }
+
+  // Constraints
+  const constraints = state.constraints.filter(r => r.trim());
+  if (constraints.length) {
+    out += `IMPORTANT — do NOT:\n${constraints.map(r => `- ${r}`).join('\n')}\n\n`;
+  }
+
+  // Copilot-specific
+  if (state.tools.copilot) {
+    out += `${state.tools.copilot}\n\n`;
+  }
+
+  return out.trim() || 'Configure your project in the editor to generate this file.';
+}
+
+function generateYAML() {
+  let out = '# agentconf.yaml\n# One config to rule them all.\n\n';
+
+  out += 'project:\n';
+  out += `  name: "${state.project.name || ''}"\n`;
+  out += `  description: "${state.project.description || ''}"\n`;
+  out += `  language: "${state.project.language || ''}"\n`;
+  out += `  framework: "${state.project.framework || ''}"\n`;
+  out += `  test_runner: "${state.project.testRunner || ''}"\n`;
+  out += `  package_manager: "${state.project.packageManager || ''}"\n\n`;
+
+  out += 'context:\n';
+  out += `  architecture: |\n    ${(state.context.architecture || 'N/A').split('\n').join('\n    ')}\n`;
+  out += `  conventions: |\n    ${(state.context.conventions || 'N/A').split('\n').join('\n    ')}\n`;
+  out += `  file_structure: |\n    ${(state.context.fileStructure || 'N/A').split('\n').join('\n    ')}\n\n`;
+
+  const rules = state.rules.filter(r => r.trim());
+  out += 'rules:\n';
+  if (rules.length) {
+    rules.forEach(r => { out += `  - "${r}"\n`; });
+  } else {
+    out += '  []\n';
+  }
+  out += '\n';
+
+  const style = state.style.filter(r => r.trim());
+  out += 'style:\n';
+  if (style.length) {
+    style.forEach(r => { out += `  - "${r}"\n`; });
+  } else {
+    out += '  []\n';
+  }
+  out += '\n';
+
+  const constraints = state.constraints.filter(r => r.trim());
+  out += 'constraints:\n';
+  if (constraints.length) {
+    constraints.forEach(r => { out += `  - "${r}"\n`; });
+  } else {
+    out += '  []\n';
+  }
+  out += '\n';
+
+  out += 'tool_overrides:\n';
+  out += '  claude: |\n';
+  out += `    ${(state.tools.claude || '').split('\n').join('\n    ') || '# Claude-specific instructions'}\n`;
+  out += '  cursor: |\n';
+  out += `    ${(state.tools.cursor || '').split('\n').join('\n    ') || '# Cursor-specific instructions'}\n`;
+  out += '  copilot: |\n';
+  out += `    ${(state.tools.copilot || '').split('\n').join('\n    ') || '# Copilot-specific instructions'}\n`;
+
+  return out;
+}
+
+// ── Preview Rendering ──────────────────────────────────────
+function renderPreview() {
+  const generators = { claude: generateClaude, cursor: generateCursor, copilot: generateCopilot, yaml: generateYAML };
+  const raw = generators[currentFormat]();
+  document.getElementById('preview-code').textContent = raw;
+  saveToLocalStorage();
+}
+
+// ── Copy / Download / Import / Export ──────────────────────
+function copyPreview() {
+  const text = document.getElementById('preview-code').textContent;
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast success show';
+  setTimeout(() => t.className = 'toast', 2000);
+}
+
+function downloadFile(name, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function downloadAll() {
+  downloadFile('CLAUDE.md', generateClaude());
+  setTimeout(() => downloadFile('.cursorrules', generateCursor()), 100);
+  setTimeout(() => downloadFile('copilot-instructions.md', generateCopilot()), 200);
+  setTimeout(() => downloadFile('agentconf.yaml', generateYAML()), 300);
+  showToast('Downloading all config files...');
+}
+
+function exportYAML() {
+  downloadFile('agentconf.yaml', generateYAML());
+  showToast('Exported agentconf.yaml');
+}
+
+function showImportModal() {
+  document.getElementById('import-modal').classList.add('show');
+  document.getElementById('import-textarea').value = '';
+  document.getElementById('import-textarea').focus();
+}
+
+function hideImportModal() {
+  document.getElementById('import-modal').classList.remove('show');
+}
+
+function importYAML() {
+  const text = document.getElementById('import-textarea').value;
+  try {
+    parseYAML(text);
+    hideImportModal();
+    renderSection();
+    renderPreview();
+    updateCounts();
+    showToast('Config imported successfully');
+  } catch (e) {
+    showToast('Import failed: ' + e.message);
+  }
+}
+
+// Simple YAML parser (handles the agentconf format)
+function parseYAML(text) {
+  const lines = text.split('\n');
+  let currentKey = '';
+  let currentSubKey = '';
+  let inMultiline = false;
+  let multilineContent = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      if (inMultiline && line.startsWith('    ')) {
+        multilineContent += trimmed + '\n';
+      } else if (inMultiline) {
+        commitMultiline(currentKey, currentSubKey, multilineContent);
+        inMultiline = false;
+        multilineContent = '';
+      }
+      continue;
+    }
+
+    if (inMultiline) {
+      if (line.startsWith('    ') || line.startsWith('\t\t')) {
+        multilineContent += trimmed + '\n';
+        continue;
+      } else {
+        commitMultiline(currentKey, currentSubKey, multilineContent);
+        inMultiline = false;
+        multilineContent = '';
+      }
+    }
+
+    // Top-level key
+    if (!line.startsWith(' ') && !line.startsWith('\t') && trimmed.endsWith(':')) {
+      currentKey = trimmed.slice(0, -1);
+      currentSubKey = '';
+      continue;
+    }
+
+    // Sub key with value
+    const subMatch = trimmed.match(/^(\w+):\s*"(.*)"/);
+    if (subMatch && currentKey === 'project') {
+      const keyMap = { name: 'name', description: 'description', language: 'language', framework: 'framework', test_runner: 'testRunner', package_manager: 'packageManager' };
+      if (keyMap[subMatch[1]]) state.project[keyMap[subMatch[1]]] = subMatch[2];
+      continue;
+    }
+
+    // Sub key with | (multiline)
+    const multiMatch = trimmed.match(/^(\w+):\s*\|/);
+    if (multiMatch) {
+      currentSubKey = multiMatch[1];
+      inMultiline = true;
+      multilineContent = '';
+      continue;
+    }
+
+    // Array item
+    if (trimmed.startsWith('- ')) {
+      let val = trimmed.slice(2).trim();
+      if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+      if (currentKey === 'rules') state.rules.push(val);
+      else if (currentKey === 'style') state.style.push(val);
+      else if (currentKey === 'constraints') state.constraints.push(val);
+      continue;
+    }
+  }
+
+  if (inMultiline) {
+    commitMultiline(currentKey, currentSubKey, multilineContent);
+  }
+}
+
+function commitMultiline(key, subKey, content) {
+  const val = content.trim();
+  if (val === 'N/A') return;
+  if (key === 'context') {
+    const map = { architecture: 'architecture', conventions: 'conventions', file_structure: 'fileStructure' };
+    if (map[subKey]) state.context[map[subKey]] = val;
+  } else if (key === 'tool_overrides') {
+    if (subKey === 'claude') state.tools.claude = val;
+    else if (subKey === 'cursor') state.tools.cursor = val;
+    else if (subKey === 'copilot') state.tools.copilot = val;
+  }
+}
+
+// ── Presets ────────────────────────────────────────────────
+function loadPreset(name) {
+  const presets = {
+    react: {
+      project: { name: 'my-react-app', description: 'A React/Next.js web application', language: 'TypeScript', framework: 'Next.js 15 (App Router)', testRunner: 'vitest', packageManager: 'pnpm' },
+      rules: ['Use functional components with hooks only', 'Prefer server components; add "use client" only when needed', 'Use Zod for runtime validation at API boundaries', 'Colocate tests next to source files as *.test.ts(x)'],
+      style: ['Use camelCase for variables and functions', 'Use PascalCase for components and types', 'Prefer named exports over default exports', 'Max file length: 300 lines — split if larger'],
+      context: { architecture: 'Next.js App Router with src/app/ for routes, src/components/ for shared UI, src/lib/ for utilities', conventions: 'All data fetching in server components or route handlers. Client components only for interactivity.', fileStructure: 'src/app/ — pages and layouts\nsrc/components/ — reusable UI\nsrc/lib/ — utilities and helpers\nsrc/types/ — shared TypeScript types' },
+      constraints: ['Never use "any" type — use "unknown" and narrow', 'Never fetch data in client components directly', 'Never use CSS-in-JS — use Tailwind CSS or CSS Modules'],
+      tools: { claude: '', cursor: '', copilot: '' }
+    },
+    python: {
+      project: { name: 'my-api', description: 'A Python FastAPI backend service', language: 'Python 3.12', framework: 'FastAPI', testRunner: 'pytest', packageManager: 'uv' },
+      rules: ['Use type hints on all function signatures', 'Use Pydantic models for request/response schemas', 'Use async/await for all I/O operations', 'Write docstrings for public functions (Google style)'],
+      style: ['Use snake_case for variables and functions', 'Use PascalCase for classes', 'Use SCREAMING_SNAKE for constants', 'Imports: stdlib → third-party → local (isort)'],
+      context: { architecture: 'FastAPI app with dependency injection. SQLAlchemy + Alembic for database.', conventions: 'All endpoints in app/routes/. Business logic in app/services/. Database models in app/models/.', fileStructure: 'app/\n  routes/ — API endpoints\n  services/ — business logic\n  models/ — SQLAlchemy models\n  schemas/ — Pydantic schemas\n  core/ — config, deps, security' },
+      constraints: ['Never use print() for logging — use structlog', 'Never commit .env files', 'Never use synchronous database calls'],
+      tools: { claude: '', cursor: '', copilot: '' }
+    },
+    rust: {
+      project: { name: 'my-rust-project', description: 'A Rust application', language: 'Rust', framework: '', testRunner: 'cargo test', packageManager: 'cargo' },
+      rules: ['Use Result<T, E> for error handling — no unwrap() in production code', 'Prefer iterators and functional style over manual loops', 'Use #[derive] macros for common traits (Debug, Clone, PartialEq)', 'Write unit tests in the same file using #[cfg(test)] mod tests'],
+      style: ['Use snake_case for functions and variables', 'Use PascalCase for types and traits', 'Use SCREAMING_SNAKE for constants', 'Keep functions under 50 lines'],
+      context: { architecture: 'Cargo workspace with multiple crates', conventions: 'Public API in lib.rs, implementation details in private modules', fileStructure: 'src/\n  lib.rs — public API\n  main.rs — binary entry point\n  modules/ — implementation' },
+      constraints: ['Never use unsafe without a SAFETY comment', 'Never use .clone() to satisfy the borrow checker — restructure instead', 'Never ignore compiler warnings'],
+      tools: { claude: '', cursor: '', copilot: '' }
+    }
+  };
+
+  const p = presets[name];
+  if (!p) return;
+
+  Object.assign(state.project, p.project);
+  state.rules = [...p.rules];
+  state.style = [...p.style];
+  Object.assign(state.context, p.context);
+  state.constraints = [...p.constraints];
+  Object.assign(state.tools, p.tools);
+
+  renderSection();
+  renderPreview();
+  updateCounts();
+  showToast(`Loaded ${name} preset`);
+}
+
+// ── LocalStorage Persistence ───────────────────────────────
+function saveToLocalStorage() {
+  try { localStorage.setItem('agentconf', JSON.stringify(state)); } catch(e) {}
+}
+
+function loadFromLocalStorage() {
+  try {
+    const saved = localStorage.getItem('agentconf');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      Object.assign(state.project, parsed.project || {});
+      if (parsed.rules) state.rules = parsed.rules;
+      if (parsed.style) state.style = parsed.style;
+      Object.assign(state.context, parsed.context || {});
+      if (parsed.constraints) state.constraints = parsed.constraints;
+      Object.assign(state.tools, parsed.tools || {});
+    }
+  } catch(e) {}
+}
+
+// ── Init ───────────────────────────────────────────────────
+loadFromLocalStorage();
+renderSection();
+renderPreview();
+updateCounts();
+</script>
+</body>
+</html>
